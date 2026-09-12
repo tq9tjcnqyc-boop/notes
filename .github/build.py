@@ -20,12 +20,15 @@ WIKI = re.compile(r"\[\[([^\[\]]+)\]\]")
 CSS = """
 :root { color-scheme: light dark; }
 body { margin: 0; background: #fbfbfa; color: #26251f;
-       font: 16px/1.8 ui-serif, "Songti SC", Georgia, serif; }
+       font-family: -apple-system, "PingFang SC", "Hiragino Sans GB",
+                    "Microsoft YaHei", sans-serif;
+       font-size: 16px; line-height: 1.8; }
 main { max-width: 44rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
 h1 { font-size: 1.1rem; font-weight: 600; color: #8a8578;
      letter-spacing: .02em; margin: 0 0 1.5rem; }
 pre { white-space: pre-wrap; word-break: break-word; margin: 0;
-      font: inherit; }
+      font: inherit;
+      font-variant-numeric: tabular-nums; }
 a { color: #2f6f4f; text-underline-offset: .2em; }
 nav { margin-bottom: 2rem; font-size: .9rem; }
 ul { list-style: none; padding: 0; }
