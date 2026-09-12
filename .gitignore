@@ -1,5 +1,6 @@
 # 编辑器的锁文件，不是笔记
 .locks/
-# 构建产物
+# 构建产物（推送到 _site 分支，不进 main）
 _site/
+_site-branch/
 .DS_Store
