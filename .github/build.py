@@ -5,6 +5,7 @@
 - 具名页 pages/名字.txt  -> _site/pages/名字.html
 - 生成 _site/index.html
 - 正文里的 [[2026-09-11]] / [[项目A]] 变成站内链接
+- 每个页面底部列出反向链接（哪些页面 [[引用了本页]]）
 """
 import html
 import os
@@ -36,40 +37,69 @@ li { margin: .2rem 0; }
 li span { color: #a9a396; margin-left: .6em; font-size: .85em; }
 .missing { color: #b5544a; text-decoration-style: dashed; }
 hr { border: 0; border-top: 1px solid #e6e3da; margin: 3rem 0 2rem; }
+.backlinks { margin-top: 3rem; border-top: 1px solid #e6e3da; padding-top: 1.25rem; }
+.backlinks h2 { font-size: .78rem; font-weight: 600; color: #a9a396;
+                letter-spacing: .1em; text-transform: uppercase; margin: 0 0 .6rem; }
+.backlinks li { font-size: .95rem; line-height: 1.7; }
 @media (prefers-color-scheme: dark) {
   body { background: #1c1c1a; color: #d8d5cc; }
   h1 { color: #8f8b80; }
   a { color: #7fc39b; }
   li span { color: #6f6b62; }
   hr { border-top-color: #33322e; }
+  .backlinks { border-top-color: #33322e; }
+  .backlinks h2 { color: #6f6b62; }
 }
 """
 
 
-def render(notes, out_file, title, body):
-    """把一段正文渲染成一个页面。"""
+def target_of(label):
+    """[[标签]] 对应的输出文件路径。"""
+    if DATE.fullmatch(label):
+        return OUT / (label.replace("-", "/") + ".html")
+    return OUT / "pages" / f"{label}.html"
+
+
+def wikilinks(body):
+    """正文里出现的 [[...]] 标签，去重并保持先后顺序。"""
+    seen = {}
+    for m in WIKI.finditer(body):
+        label = m.group(1).strip()
+        if label:
+            seen.setdefault(label, None)
+    return list(seen)
+
+
+def render(notes, out_file, title, body, links):
+    """把一段正文渲染成一个页面；links 是 [(标题, 输出路径)] 的反向链接。"""
     def href(target):
         return html.escape(os.path.relpath(target, out_file.parent))
 
     def wiki(m):
         label = m.group(1).strip()
-        if DATE.fullmatch(label):
-            target = OUT / (label.replace("-", "/") + ".html")
-        else:
-            target = OUT / "pages" / f"{label}.html"
+        target = target_of(label)
         cls = "" if target in notes else ' class="missing"'
         return f'<a href="{href(target)}"{cls}>{html.escape(label)}</a>'
 
     text = html.escape(body)
     text = WIKI.sub(wiki, text)
     back = f'<nav><a href="{href(OUT / "index.html")}">← 全部笔记</a></nav>'
+    if links:
+        rows = "".join(
+            f'<li><a href="{href(target)}">{html.escape(name)}</a></li>'
+            for name, target in links
+        )
+        section = (f'<section class="backlinks"><h2>链接到本页</h2>'
+                   f"<ul>{rows}</ul></section>")
+    else:
+        section = ""
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(
         f'<!doctype html><html lang="zh"><head><meta charset="utf-8">'
         f'<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{html.escape(title)}</title><style>{CSS}</style></head>"
         f"<body><main>{back}<h1>{html.escape(title)}</h1>"
-        f"<pre>{text}</pre></main></body></html>\n",
+        f"<pre>{text}</pre>{section}</main></body></html>\n",
         encoding="utf-8",
     )
 
@@ -88,11 +118,27 @@ def main():
             pages.append(src)
             notes.add(OUT / "pages" / f"{src.stem}.html")
 
+    # 先把所有页面读进来，算出各自的标题和反向链接，再统一渲染。
+    documents = []      # (out_file, 标题, 正文)
+    titles = {}         # out_file -> 标题
     for src in dailies + pages:
         rel = src.relative_to(ROOT).with_suffix(".html")
         title = ("-".join(src.relative_to(ROOT).with_suffix("").parts)
                  if src in dailies else src.stem)
-        render(notes, OUT / rel, title, src.read_text(encoding="utf-8").strip())
+        out_file = OUT / rel
+        titles[out_file] = title
+        documents.append((out_file, title, src.read_text(encoding="utf-8").strip()))
+
+    backlinks = {out_file: [] for out_file, _, _ in documents}
+    for out_file, title, body in documents:
+        for label in wikilinks(body):
+            target = target_of(label)
+            if target in titles and target != out_file:
+                backlinks[target].append((title, out_file))
+
+    for out_file, title, body in documents:
+        links = sorted(backlinks[out_file], key=lambda item: item[0])
+        render(notes, out_file, title, body, links)
 
     rows = []
     for src in reversed(dailies):
