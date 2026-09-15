@@ -1,0 +1,44 @@
+name: publish notes
+
+# 在 Actions 里构建并发到 GitHub Pages。
+# 这条链路替代了 Pages 内置构建器 —— 官方文档：10 次/小时的软限制
+# 「does not apply if you build and publish your site with a custom GitHub Actions workflow」。
+#
+# 仓库是 public，所以 Actions 分钟数免费且不限。
+# 构建只依赖 Python 标准库（见 .github/build.py），runner 上开箱即用。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: 构建静态站（纯标准库）
+        run: python3 .github/build.py
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
